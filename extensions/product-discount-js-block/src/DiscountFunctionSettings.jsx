@@ -16,7 +16,7 @@ import {
   Link,
   useApi,
   TextField,
-  ProgressIndicator,
+  ProgressIndicator
 } from '@shopify/ui-extensions-react/admin';
 // [END discount-ui-extension.ui-components]
 import { useState, useEffect } from 'react';
@@ -26,7 +26,7 @@ import { useState, useEffect } from 'react';
 const TARGET = 'admin.discount-details.function-settings.render';
 // [END discount-ui-extension.target]
 
-export default reactExtension(TARGET, async (api) => {
+export default reactExtension(TARGET, async api => {
   const existingDefinition = await getMetafieldDefinition(api.query);
   if (!existingDefinition) {
     // Create a metafield definition for persistence if no pre-existing definition exists
@@ -43,12 +43,8 @@ export default reactExtension(TARGET, async (api) => {
 // [START discount-ui-extension.collections-field]
 function CollectionsField({ defaultValue, value, onChange }) {
   return (
-    <Box display="none">
-      <TextField
-        defaultValue={defaultValue}
-        value={value.map((collection) => collection.id)}
-        onChange={onChange}
-      />
+    <Box display='none'>
+      <TextField defaultValue={defaultValue} value={value.map(collection => collection.id)} onChange={onChange} />
     </Box>
   );
 }
@@ -57,19 +53,19 @@ function CollectionsField({ defaultValue, value, onChange }) {
 
 function PercentageField({ defaultValue, value, onChange, i18n }) {
   return (
-    <Box paddingBlockEnd="300">
-      <BlockStack gap="base">
-        <Text variant="headingMd" as="h2">
+    <Box paddingBlockEnd='300'>
+      <BlockStack gap='base'>
+        <Text variant='headingMd' as='h2'>
           {i18n.translate('description')}
         </Text>
         <NumberField
           label={i18n.translate('discountPercentage')}
-          name="percentage"
-          autoComplete="on"
+          name='percentage'
+          autoComplete='on'
           value={value}
           defaultValue={defaultValue}
           onChange={onChange}
-          suffix="%"
+          suffix='%'
         />
       </BlockStack>
     </Box>
@@ -93,7 +89,7 @@ function App() {
     percentage,
     selectedCollections,
     selectedProductGroups,
-    resetForm,
+    resetForm
   } = useExtensionData();
   return (
     <FunctionSettings onSave={applyExtensionMetafieldChange}>
@@ -116,8 +112,8 @@ function App() {
             i18n={i18n}
           />
         </Section>
-        <Section padding="base">
-          <Box padding="base none">
+        <Section padding='base'>
+          <Box padding='base none'>
             <CollectionsSection
               loading={loading}
               selectedCollections={selectedCollections}
@@ -127,8 +123,8 @@ function App() {
             />
           </Box>
         </Section>
-        <Section padding="base">
-          <Box padding="base none">
+        <Section padding='base'>
+          <Box padding='base none'>
             <ProductGroupsSection
               loading={loading}
               selectedProductGroups={selectedProductGroups}
@@ -145,35 +141,21 @@ function App() {
 // [END discount-ui-extension.app-component]
 
 // [START discount-ui-extension.collections-section]
-function CollectionsSection({
-  i18n,
-  loading,
-  onClickAdd,
-  onClickRemove,
-  selectedCollections,
-}) {
+function CollectionsSection({ i18n, loading, onClickAdd, onClickRemove, selectedCollections }) {
   const collectionRows =
     selectedCollections && selectedCollections.length > 0
-      ? selectedCollections.map((collection) => (
-          <BlockStack gap="base" key={collection.id}>
-            <InlineStack
-              blockAlignment="center"
-              inlineAlignment="space-between"
-            >
+      ? selectedCollections.map(collection => (
+          <BlockStack gap='base' key={collection.id}>
+            <InlineStack blockAlignment='center' inlineAlignment='space-between'>
               <Link
-                href={`shopify://admin/collections/${collection.id
-                  .split('/')
-                  .pop()}`}
-                tone="inherit"
-                target="_blank"
+                href={`shopify://admin/collections/${collection.id.split('/').pop()}`}
+                tone='inherit'
+                target='_blank'
               >
                 {collection.title}
               </Link>
-              <Button
-                variant="tertiary"
-                onClick={() => onClickRemove(collection.id)}
-              >
-                <Icon name="CircleCancelMajor" />
+              <Button variant='tertiary' onClick={() => onClickRemove(collection.id)}>
+                <Icon name='CircleCancelMajor' />
               </Button>
             </InlineStack>
             <Divider />
@@ -182,21 +164,17 @@ function CollectionsSection({
       : null;
   return (
     <Section>
-      <BlockStack gap="base">
+      <BlockStack gap='base'>
         {loading ? (
-          <InlineStack gap inlineAlignment="center" padding="base">
+          <InlineStack gap inlineAlignment='center' padding='base'>
             <ProgressIndicator />
           </InlineStack>
         ) : null}
 
         {collectionRows}
         <Button onClick={onClickAdd}>
-          <InlineStack
-            blockAlignment="center"
-            inlineAlignment="start"
-            gap="base"
-          >
-            <Icon name="CirclePlusMajor" />
+          <InlineStack blockAlignment='center' inlineAlignment='start' gap='base'>
+            <Icon name='CirclePlusMajor' />
             {i18n.translate('addCollections')}
           </InlineStack>
         </Button>
@@ -217,12 +195,8 @@ function useExtensionData() {
   const [selectedProductGroups, setSelectedProductGroups] = useState([]);
   const [initialCollectionIds, setInitialCollectionIds] = useState([]);
   const [initialProductGroupIds, setInitialProductGroupIds] = useState([]);
-  const [initialSelectedCollections, setInitialSelectedCollections] = useState(
-    []
-  );
-  const [initialSelectedProductGroups, setInitialSelectedProductGroups] = useState(
-    []
-  );
+  const [initialSelectedCollections, setInitialSelectedCollections] = useState([]);
+  const [initialSelectedProductGroups, setInitialSelectedProductGroups] = useState([]);
   const [initialPercentage, setInitialPercentage] = useState(0);
 
   useEffect(() => {
@@ -234,73 +208,61 @@ function useExtensionData() {
       }
 
       const transferPercentage = parsePercentageMetafield(
-        savedMetafields.find(
-          (metafield) => metafield.key === 'function-configuration'
-        )?.value
+        savedMetafields.find(metafield => metafield.key === 'function-configuration')?.value
       );
       setInitialPercentage(Number(transferPercentage));
       setPercentage(Number(transferPercentage));
 
-      const transferExcludedCollectionIds =
-        parseTransferExcludedCollectionIdsMetafield(
-          savedMetafields.find(
-            (metafield) => metafield.key === 'function-configuration'
-          )?.value
-        );
+      const transferExcludedCollectionIds = parseTransferExcludedCollectionIdsMetafield(
+        savedMetafields.find(metafield => metafield.key === 'function-configuration')?.value
+      );
       setInitialCollectionIds(transferExcludedCollectionIds);
 
-      const transferExcludedProductGroupIds =
-        parseTransferExcludedProductGroupIdsMetafield(
-          savedMetafields.find(
-            (metafield) => metafield.key === 'function-configuration'
-          )?.value
-        );
+      const transferExcludedProductGroupIds = parseTransferExcludedProductGroupIdsMetafield(
+        savedMetafields.find(metafield => metafield.key === 'function-configuration')?.value
+      );
       setInitialProductGroupIds(transferExcludedProductGroupIds);
 
-      await getCollectionTitles(transferExcludedCollectionIds, query).then(
-        (results) => {
-          const collections = results.data.nodes.map((collection) => ({
-            id: collection.id,
-            title: collection.title,
-          }));
-          setSelectedCollections(collections);
-          setInitialSelectedCollections(collections);
-          return;
-        }
-      );
+      await getCollectionTitles(transferExcludedCollectionIds, query).then(results => {
+        const collections = results.data.nodes.map(collection => ({
+          id: collection.id,
+          title: collection.title
+        }));
+        setSelectedCollections(collections);
+        setInitialSelectedCollections(collections);
+        return;
+      });
 
-      await getProductGroupTitles(transferExcludedProductGroupIds, query).then(
-        (results) => {
-          const productGroups = results.data.nodes.map((group) => ({
-            id: group.id,
-            title: group.title,
-          }));
-          setSelectedProductGroups(productGroups);
-          setInitialSelectedProductGroups(productGroups);
-          return;
-        }
-      );
+      await getProductGroupTitles(transferExcludedProductGroupIds, query).then(results => {
+        const productGroups = results.data.nodes.map(group => ({
+          id: group.id,
+          title: group.title
+        }));
+        setSelectedProductGroups(productGroups);
+        setInitialSelectedProductGroups(productGroups);
+        return;
+      });
 
       setLoading(false);
     }
     fetchInitialData();
   }, [initialMetafields]);
 
-  const onPercentageValueChange = async (value) => {
+  const onPercentageValueChange = async value => {
     setPercentage(Number(value));
   };
 
   async function onSelectCollections() {
     const selection = await resourcePicker({
       type: 'collection',
-      selectionIds: selectedCollections.map((collection) => ({
-        id: collection.id,
+      selectionIds: selectedCollections.map(collection => ({
+        id: collection.id
       })),
       action: 'select',
       filter: {
         archived: true,
-        variants: true,
-      },
+        variants: true
+      }
     });
     setSelectedCollections(selection);
   }
@@ -308,14 +270,14 @@ function useExtensionData() {
   async function onSelectProductGroups() {
     const selection = await resourcePicker({
       type: 'product',
-      selectionIds: selectedProductGroups.map((group) => ({
-        id: group.id,
+      selectionIds: selectedProductGroups.map(group => ({
+        id: group.id
       })),
       action: 'select',
       filter: {
         archived: true,
-        variants: true,
-      },
+        variants: true
+      }
     });
     setSelectedProductGroups(selection);
   }
@@ -323,29 +285,25 @@ function useExtensionData() {
   async function applyExtensionMetafieldChange() {
     const commitFormValues = {
       percentage: Number(percentage),
-      collections: selectedCollections.map((collection) => collection.id),
-      productGroups: selectedProductGroups.map((group) => group.id),
+      collections: selectedCollections.map(collection => collection.id),
+      productGroups: selectedProductGroups.map(group => group.id)
     };
     await applyMetafieldChange({
       type: 'updateMetafield',
       namespace: '$app:example-discounts--ui-extension',
       key: 'function-configuration',
       value: JSON.stringify(commitFormValues),
-      valueType: 'json',
+      valueType: 'json'
     });
   }
 
   async function handleRemoveCollection(id) {
-    const updatedCollections = selectedCollections.filter(
-      (collection) => collection.id !== id
-    );
+    const updatedCollections = selectedCollections.filter(collection => collection.id !== id);
     setSelectedCollections(updatedCollections);
   }
 
   async function handleRemoveProductGroup(id) {
-    const updatedProductGroups = selectedProductGroups.filter(
-      (group) => group.id !== id
-    );
+    const updatedProductGroups = selectedProductGroups.filter(group => group.id !== id);
     setSelectedProductGroups(updatedProductGroups);
   }
 
@@ -368,7 +326,7 @@ function useExtensionData() {
       setPercentage(initialPercentage);
       setSelectedCollections(initialSelectedCollections);
       setSelectedProductGroups(initialSelectedProductGroups);
-    },
+    }
   };
 }
 // [END discount-ui-extension.use-collection]
@@ -394,13 +352,13 @@ async function getMetafieldDefinition(adminApiQuery) {
 async function createMetafieldDefinition(adminApiQuery) {
   const definition = {
     access: {
-      admin: 'MERCHANT_READ_WRITE',
+      admin: 'MERCHANT_READ_WRITE'
     },
     key: METAFIELD_KEY,
     name: 'Discount Configuration',
     namespace: METAFIELD_NAMESPACE,
     ownerType: 'DISCOUNT',
-    type: 'json',
+    type: 'json'
   };
 
   const query = `#graphql
@@ -454,45 +412,23 @@ function parsePercentageMetafield(value) {
 
 function ProductGroupsField({ defaultValue, value, onChange }) {
   return (
-    <Box display="none">
-      <TextField
-        defaultValue={defaultValue}
-        value={value.map((group) => group.id)}
-        onChange={onChange}
-      />
+    <Box display='none'>
+      <TextField defaultValue={defaultValue} value={value.map(group => group.id)} onChange={onChange} />
     </Box>
   );
 }
 
-function ProductGroupsSection({
-  i18n,
-  loading,
-  onClickAdd,
-  onClickRemove,
-  selectedProductGroups,
-}) {
+function ProductGroupsSection({ i18n, loading, onClickAdd, onClickRemove, selectedProductGroups }) {
   const productGroupRows =
     selectedProductGroups && selectedProductGroups.length > 0
-      ? selectedProductGroups.map((group) => (
-          <BlockStack gap="base" key={group.id}>
-            <InlineStack
-              blockAlignment="center"
-              inlineAlignment="space-between"
-            >
-              <Link
-                href={`shopify://admin/product_groups/${group.id
-                  .split('/')
-                  .pop()}`}
-                tone="inherit"
-                target="_blank"
-              >
+      ? selectedProductGroups.map(group => (
+          <BlockStack gap='base' key={group.id}>
+            <InlineStack blockAlignment='center' inlineAlignment='space-between'>
+              <Link href={`shopify://admin/product_groups/${group.id.split('/').pop()}`} tone='inherit' target='_blank'>
                 {group.title}
               </Link>
-              <Button
-                variant="tertiary"
-                onClick={() => onClickRemove(group.id)}
-              >
-                <Icon name="CircleCancelMajor" />
+              <Button variant='tertiary' onClick={() => onClickRemove(group.id)}>
+                <Icon name='CircleCancelMajor' />
               </Button>
             </InlineStack>
             <Divider />
@@ -501,21 +437,17 @@ function ProductGroupsSection({
       : null;
   return (
     <Section>
-      <BlockStack gap="base">
+      <BlockStack gap='base'>
         {loading ? (
-          <InlineStack gap inlineAlignment="center" padding="base">
+          <InlineStack gap inlineAlignment='center' padding='base'>
             <ProgressIndicator />
           </InlineStack>
         ) : null}
 
         {productGroupRows}
         <Button onClick={onClickAdd}>
-          <InlineStack
-            blockAlignment="center"
-            inlineAlignment="start"
-            gap="base"
-          >
-            <Icon name="CirclePlusMajor" />
+          <InlineStack blockAlignment='center' inlineAlignment='start' gap='base'>
+            <Icon name='CirclePlusMajor' />
             {i18n.translate('addProductGroups')}
           </InlineStack>
         </Button>
