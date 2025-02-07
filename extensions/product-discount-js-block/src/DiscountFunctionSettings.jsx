@@ -82,13 +82,17 @@ function App() {
     loading,
     applyExtensionMetafieldChange,
     handleRemoveCollection,
+    handleRemoveProductGroup,
     i18n,
     initialSelectedCollections,
+    initialSelectedProductGroups,
     initialPercentage,
     onPercentageValueChange,
     onSelectCollections,
+    onSelectProductGroups,
     percentage,
     selectedCollections,
+    selectedProductGroups,
     resetForm,
   } = useExtensionData();
   return (
@@ -99,6 +103,11 @@ function App() {
             defaultValue={initialSelectedCollections}
             value={selectedCollections}
             onChange={onSelectCollections}
+          />
+          <ProductGroupsField
+            defaultValue={initialSelectedProductGroups}
+            value={selectedProductGroups}
+            onChange={onSelectProductGroups}
           />
           <PercentageField
             value={percentage}
@@ -114,6 +123,17 @@ function App() {
               selectedCollections={selectedCollections}
               onClickAdd={onSelectCollections}
               onClickRemove={handleRemoveCollection}
+              i18n={i18n}
+            />
+          </Box>
+        </Section>
+        <Section padding="base">
+          <Box padding="base none">
+            <ProductGroupsSection
+              loading={loading}
+              selectedProductGroups={selectedProductGroups}
+              onClickAdd={onSelectProductGroups}
+              onClickRemove={handleRemoveProductGroup}
               i18n={i18n}
             />
           </Box>
@@ -194,8 +214,13 @@ function useExtensionData() {
   const [percentage, setPercentage] = useState(0);
   const [savedMetafields] = useState(initialMetafields);
   const [selectedCollections, setSelectedCollections] = useState([]);
+  const [selectedProductGroups, setSelectedProductGroups] = useState([]);
   const [initialCollectionIds, setInitialCollectionIds] = useState([]);
+  const [initialProductGroupIds, setInitialProductGroupIds] = useState([]);
   const [initialSelectedCollections, setInitialSelectedCollections] = useState(
+    []
+  );
+  const [initialSelectedProductGroups, setInitialSelectedProductGroups] = useState(
     []
   );
   const [initialPercentage, setInitialPercentage] = useState(0);
@@ -203,7 +228,10 @@ function useExtensionData() {
   useEffect(() => {
     async function fetchInitialData() {
       setLoading(true);
-      if (!selectedCollections) {
+      console.log('>>>> fetchInitialData start');
+
+      if (!selectedCollections && !selectedProductGroups) {
+        console.log('>>>> fetchInitialData IF');
         return;
       }
 
@@ -223,6 +251,14 @@ function useExtensionData() {
         );
       setInitialCollectionIds(transferExcludedCollectionIds);
 
+      const transferExcludedProductGroupIds =
+        parseTransferExcludedProductGroupIdsMetafield(
+          savedMetafields.find(
+            (metafield) => metafield.key === 'function-configuration'
+          )?.value
+        );
+      setInitialProductGroupIds(transferExcludedProductGroupIds);
+
       await getCollectionTitles(transferExcludedCollectionIds, query).then(
         (results) => {
           const collections = results.data.nodes.map((collection) => ({
@@ -231,9 +267,25 @@ function useExtensionData() {
           }));
           setSelectedCollections(collections);
           setInitialSelectedCollections(collections);
+          console.log('>>>> fetchInitialData getCollectionTitles');
           return;
         }
       );
+
+      await getProductGroupTitles(transferExcludedProductGroupIds, query).then(
+        (results) => {
+          const productGroups = results.data.nodes.map((group) => ({
+            id: group.id,
+            title: group.title,
+          }));
+          setSelectedProductGroups(productGroups);
+          setInitialSelectedProductGroups(productGroups);
+          console.log('>>>> fetchInitialData getProductGroupTitles');
+          return;
+        }
+      );
+      console.log('>>>> fetchInitialData finish');
+
       setLoading(false);
     }
     fetchInitialData();
@@ -258,11 +310,26 @@ function useExtensionData() {
     setSelectedCollections(selection);
   }
 
-  // [START discount-ui-extension.apply-extension-metafield-change]
+  async function onSelectProductGroups() {
+    const selection = await resourcePicker({
+      type: 'product',
+      selectionIds: selectedProductGroups.map((group) => ({
+        id: group.id,
+      })),
+      action: 'select',
+      filter: {
+        archived: true,
+        variants: true,
+      },
+    });
+    setSelectedProductGroups(selection);
+  }
+
   async function applyExtensionMetafieldChange() {
     const commitFormValues = {
       percentage: Number(percentage),
       collections: selectedCollections.map((collection) => collection.id),
+      productGroups: selectedProductGroups.map((group) => group.id),
     };
     await applyMetafieldChange({
       type: 'updateMetafield',
@@ -272,7 +339,6 @@ function useExtensionData() {
       valueType: 'json',
     });
   }
-  // [END discount-ui-extension.apply-extension-metafield-change]
 
   async function handleRemoveCollection(id) {
     const updatedCollections = selectedCollections.filter(
@@ -281,20 +347,32 @@ function useExtensionData() {
     setSelectedCollections(updatedCollections);
   }
 
+  async function handleRemoveProductGroup(id) {
+    const updatedProductGroups = selectedProductGroups.filter(
+      (group) => group.id !== id
+    );
+    setSelectedProductGroups(updatedProductGroups);
+  }
+
   return {
     loading,
     applyExtensionMetafieldChange,
     handleRemoveCollection,
+    handleRemoveProductGroup,
     i18n,
     initialSelectedCollections: initialCollectionIds,
+    initialSelectedProductGroups: initialProductGroupIds,
     initialPercentage,
     onPercentageValueChange,
     onSelectCollections,
+    onSelectProductGroups,
     percentage,
     selectedCollections,
+    selectedProductGroups,
     resetForm: () => {
       setPercentage(initialPercentage);
       setSelectedCollections(initialSelectedCollections);
+      setSelectedProductGroups(initialSelectedProductGroups);
     },
   };
 }
@@ -378,3 +456,98 @@ function parsePercentageMetafield(value) {
   }
 }
 // [END discount-ui-extension.ui-extension]
+
+
+function ProductGroupsField({ defaultValue, value, onChange }) {
+  return (
+    <Box display="none">
+      <TextField
+        defaultValue={defaultValue}
+        value={value.map((group) => group.id)}
+        onChange={onChange}
+      />
+    </Box>
+  );
+}
+
+function ProductGroupsSection({
+  i18n,
+  loading,
+  onClickAdd,
+  onClickRemove,
+  selectedProductGroups,
+}) {
+  const productGroupRows =
+    selectedProductGroups && selectedProductGroups.length > 0
+      ? selectedProductGroups.map((group) => (
+          <BlockStack gap="base" key={group.id}>
+            <InlineStack
+              blockAlignment="center"
+              inlineAlignment="space-between"
+            >
+              <Link
+                href={`shopify://admin/product_groups/${group.id
+                  .split('/')
+                  .pop()}`}
+                tone="inherit"
+                target="_blank"
+              >
+                {group.title}
+              </Link>
+              <Button
+                variant="tertiary"
+                onClick={() => onClickRemove(group.id)}
+              >
+                <Icon name="CircleCancelMajor" />
+              </Button>
+            </InlineStack>
+            <Divider />
+          </BlockStack>
+        ))
+      : null;
+  return (
+    <Section>
+      <BlockStack gap="base">
+        {loading ? (
+          <InlineStack gap inlineAlignment="center" padding="base">
+            <ProgressIndicator />
+          </InlineStack>
+        ) : null}
+
+        {productGroupRows}
+        <Button onClick={onClickAdd}>
+          <InlineStack
+            blockAlignment="center"
+            inlineAlignment="start"
+            gap="base"
+          >
+            <Icon name="CirclePlusMajor" />
+            {i18n.translate('addProductGroups')}
+          </InlineStack>
+        </Button>
+      </BlockStack>
+    </Section>
+  );
+}
+
+async function getProductGroupTitles(productGroupGids, adminApiQuery) {
+  return adminApiQuery(`
+    {
+      nodes(ids: ${JSON.stringify(productGroupGids)}) {
+        ... on Product {
+          id
+          title
+          description
+        }
+      }
+    }
+  `);
+}
+
+function parseTransferExcludedProductGroupIdsMetafield(value) {
+  try {
+    return JSON.parse(value).productGroups;
+  } catch {
+    return [];
+  }
+}
