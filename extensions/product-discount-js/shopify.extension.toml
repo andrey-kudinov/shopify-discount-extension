@@ -1,0 +1,31 @@
+api_version = "2025-01"
+
+[[extensions]]
+name = "t:name"
+handle = "product-discount-js"
+type = "function"
+
+description = "t:description"
+
+  [[extensions.targeting]]
+  target = "purchase.product-discount.run"
+  input_query = "src/run.graphql"
+  export = "run"
+
+  [extensions.build]
+  command = ""
+  path = "dist/function.wasm"
+
+  [extensions.ui.paths]
+  create = "/"
+  details = "/"
+
+
+# [START discount-ui-extension.configuration]
+  [extensions.ui]
+  handle = "product-discount-js-block"
+
+  [extensions.input.variables]
+  namespace = "$app:example-discounts--ui-extension"
+  key = "function-configuration"
+# [END discount-ui-extension.configuration]
