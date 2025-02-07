@@ -228,10 +228,8 @@ function useExtensionData() {
   useEffect(() => {
     async function fetchInitialData() {
       setLoading(true);
-      console.log('>>>> fetchInitialData start');
 
       if (!selectedCollections && !selectedProductGroups) {
-        console.log('>>>> fetchInitialData IF');
         return;
       }
 
@@ -267,7 +265,6 @@ function useExtensionData() {
           }));
           setSelectedCollections(collections);
           setInitialSelectedCollections(collections);
-          console.log('>>>> fetchInitialData getCollectionTitles');
           return;
         }
       );
@@ -280,11 +277,9 @@ function useExtensionData() {
           }));
           setSelectedProductGroups(productGroups);
           setInitialSelectedProductGroups(productGroups);
-          console.log('>>>> fetchInitialData getProductGroupTitles');
           return;
         }
       );
-      console.log('>>>> fetchInitialData finish');
 
       setLoading(false);
     }
@@ -456,7 +451,6 @@ function parsePercentageMetafield(value) {
   }
 }
 // [END discount-ui-extension.ui-extension]
-
 
 function ProductGroupsField({ defaultValue, value, onChange }) {
   return (
