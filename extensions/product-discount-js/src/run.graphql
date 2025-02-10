@@ -7,7 +7,7 @@ query RunInput($collections: [ID!]) {
         ... on ProductVariant {
           id
           product {
-            inAnyCollection(ids: $collections)
+            id
           }
         }
       }
