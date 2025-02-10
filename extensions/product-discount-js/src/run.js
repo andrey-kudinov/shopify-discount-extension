@@ -39,63 +39,49 @@ export function run(input) {
 
   const cartProducts = input.cart.lines
     .filter(line => line.merchandise.__typename === 'ProductVariant')
-    .map(line => /** @type {ProductVariant} */ ({ id: line.merchandise.product.id, quantity: line.quantity }));
+    .map(
+      line =>
+        /** @type {ProductVariant} */ ({
+          id: line.merchandise.product.id,
+          variantId: /** @type {ProductVariant} */ (line.merchandise).id,
+          quantity: line.quantity
+        })
+    );
 
-  const result = {};
-  const stock = [];
+  const groupedCart = {};
+  for (const group of groups) {
+    groupedCart[group.id] = cartProducts.filter(product => group.products.includes(product.id));
+  }
 
-  for (const product of cartProducts) {
-    if (!stock.length) {
-      for (const group of groups) {
-        if (group.products.includes(product.id)) {
-          stock.push(product);
-          break;
-        }
-      }
-    } else if (stock.length) {
-      for (const group of groups) {
-        const last = stock[stock.length - 1];
-        if (group.products.includes(product.id) && !group.products.includes(last.id)) {
-          const minQuantity = Math.min(product.quantity, last.quantity);
+  let result = {};
 
-          if (!result[last.id]) {
-            result[last.id] = minQuantity;
-          } else {
-            result[last.id] += minQuantity;
-          }
+  const minSets = Math.min(...groups.map(group => groupedCart[group.id].reduce((sum, item) => sum + item.quantity, 0)));
 
-          if (!result[product.id]) {
-            result[product.id] = minQuantity;
-          } else {
-            result[product.id] += minQuantity;
-          }
-
-          stock.length = 0;
-          break;
+  if (minSets > 0) {
+    for (const group of groups) {
+      let remaining = minSets;
+      for (const product of groupedCart[group.id] || []) {
+        let applyDiscount = Math.min(product.quantity, remaining);
+        if (applyDiscount > 0) {
+          result[product.id] = (result[product.id] || 0) + applyDiscount;
+          remaining -= applyDiscount;
         }
       }
     }
+  } else {
+    return EMPTY_DISCOUNT;
   }
 
   console.log(JSON.stringify({ result }));
 
-  const targets = input.cart.lines
-    .filter(line => {
-      if (line.merchandise.__typename === 'ProductVariant') {
-        const variant = /** @type {ProductVariant} */ (line.merchandise);
-        return result[variant.product.id];
+  const targets = cartProducts
+    .filter(product => result[product.id])
+    .map(product => ({
+      productVariant: {
+        id: product.variantId,
+        quantity: result[product.id]
       }
-      return false;
-    })
-    .map(line => {
-      const variant = /** @type {ProductVariant} */ (line.merchandise);
-      return /** @type {Target} */ ({
-        productVariant: {
-          id: variant.id,
-          quantity: result[variant.product.id]
-        }
-      });
-    });
+    }));
 
   console.log(JSON.stringify({ targets }));
 

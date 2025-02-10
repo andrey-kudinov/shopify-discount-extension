@@ -8,6 +8,7 @@ query RunInput($collections: [ID!]) {
           id
           product {
             id
+            inAnyCollection(ids: $collections)
           }
         }
       }
