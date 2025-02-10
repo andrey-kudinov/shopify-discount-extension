@@ -19,7 +19,7 @@ import {
   ProgressIndicator
 } from '@shopify/ui-extensions-react/admin';
 // [END discount-ui-extension.ui-components]
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 
 // [START discount-ui-extension.target]
 // The target used here must match the target used in the extension toml file
@@ -78,17 +78,19 @@ function App() {
     loading,
     applyExtensionMetafieldChange,
     handleRemoveCollection,
-    handleRemoveProductGroup,
+    handleRemoveGroup,
+    handleRemoveProduct,
     i18n,
     initialSelectedCollections,
-    initialSelectedProductGroups,
+    initialSelectedGroups,
     initialPercentage,
     onPercentageValueChange,
     onSelectCollections,
-    onSelectProductGroups,
+    handleAddProductsToGroup,
+    handleAddGroup,
     percentage,
     selectedCollections,
-    selectedProductGroups,
+    groups,
     resetForm
   } = useExtensionData();
   return (
@@ -101,9 +103,9 @@ function App() {
             onChange={onSelectCollections}
           />
           <ProductGroupsField
-            defaultValue={initialSelectedProductGroups}
-            value={selectedProductGroups}
-            onChange={onSelectProductGroups}
+            defaultValue={initialSelectedGroups}
+            value={groups}
+            onChange={handleAddProductsToGroup}
           />
           <PercentageField
             value={percentage}
@@ -112,6 +114,9 @@ function App() {
             i18n={i18n}
           />
         </Section>
+
+        <Divider />
+
         <Section padding='base'>
           <Box padding='base none'>
             <CollectionsSection
@@ -123,13 +128,18 @@ function App() {
             />
           </Box>
         </Section>
+
+        <Divider />
+
         <Section padding='base'>
           <Box padding='base none'>
-            <ProductGroupsSection
+            <GroupsSection
               loading={loading}
-              selectedProductGroups={selectedProductGroups}
-              onClickAdd={onSelectProductGroups}
-              onClickRemove={handleRemoveProductGroup}
+              groups={groups}
+              onClickAddProducts={handleAddProductsToGroup}
+              onClickAddGroup={handleAddGroup}
+              onClickRemoveGroup={handleRemoveGroup}
+              onClickRemoveProduct={handleRemoveProduct}
               i18n={i18n}
             />
           </Box>
@@ -192,18 +202,17 @@ function useExtensionData() {
   const [percentage, setPercentage] = useState(0);
   const [savedMetafields] = useState(initialMetafields);
   const [selectedCollections, setSelectedCollections] = useState([]);
-  const [selectedProductGroups, setSelectedProductGroups] = useState([]);
   const [initialCollectionIds, setInitialCollectionIds] = useState([]);
-  const [initialProductGroupIds, setInitialProductGroupIds] = useState([]);
   const [initialSelectedCollections, setInitialSelectedCollections] = useState([]);
-  const [initialSelectedProductGroups, setInitialSelectedProductGroups] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [initialGroupIds, setInitialGroupIds] = useState([]);
+  const [initialSelectedGroups, setInitialSelectedGroups] = useState([]);
   const [initialPercentage, setInitialPercentage] = useState(0);
 
   useEffect(() => {
     async function fetchInitialData() {
       setLoading(true);
-
-      if (!selectedCollections && !selectedProductGroups) {
+      if (!selectedCollections && !groups) {
         return;
       }
 
@@ -221,7 +230,7 @@ function useExtensionData() {
       const transferExcludedProductGroupIds = parseTransferExcludedProductGroupIdsMetafield(
         savedMetafields.find(metafield => metafield.key === 'function-configuration')?.value
       );
-      setInitialProductGroupIds(transferExcludedProductGroupIds);
+      setInitialGroupIds(transferExcludedProductGroupIds);
 
       await getCollectionTitles(transferExcludedCollectionIds, query).then(results => {
         const collections = results.data.nodes.map(collection => ({
@@ -232,16 +241,27 @@ function useExtensionData() {
         setInitialSelectedCollections(collections);
         return;
       });
+      const productGroupsData = JSON.parse(
+        savedMetafields.find(metafield => metafield.key === 'function-configuration')?.value ?? '{}'
+      ).productGroups ?? [];
 
-      await getProductGroupTitles(transferExcludedProductGroupIds, query).then(results => {
-        const productGroups = results.data.nodes.map(group => ({
-          id: group.id,
-          title: group.title
-        }));
-        setSelectedProductGroups(productGroups);
-        setInitialSelectedProductGroups(productGroups);
-        return;
-      });
+      if (productGroupsData) {
+        const productGroups = await Promise.all(
+          productGroupsData.map(async group => {
+            const products = await getProductTitles(group.products, query);
+            return {
+              id: group.id,
+              title: group.title,
+              products: products.data.nodes.map(product => ({
+                id: product.id,
+                title: product.title
+              }))
+            };
+          })
+        );
+        setGroups(productGroups);
+        setInitialSelectedGroups(productGroups);
+      }
 
       setLoading(false);
     }
@@ -267,26 +287,40 @@ function useExtensionData() {
     setSelectedCollections(selection);
   }
 
-  async function onSelectProductGroups() {
+  async function handleAddProductsToGroup(id) {
+    const groupToUpdate = groups.find(group => group.id === id);
+
+    if (!groupToUpdate) {
+      console.error('Group not found');
+      return;
+    }
+
     const selection = await resourcePicker({
       type: 'product',
-      selectionIds: selectedProductGroups.map(group => ({
-        id: group.id
-      })),
+      selectionIds: groupToUpdate.products.map(product => ({ id: product.id })),
       action: 'select',
       filter: {
         archived: true,
         variants: true
       }
     });
-    setSelectedProductGroups(selection);
+
+    setGroups(prevGroups => prevGroups.map(group => (group.id === id ? { ...group, products: selection } : group)));
+  }
+
+  async function handleAddGroup(newGroupId) {
+    setGroups(prevGroups => [...prevGroups, { id: newGroupId, products: [], title: `Group ${newGroupId}` }]);
   }
 
   async function applyExtensionMetafieldChange() {
     const commitFormValues = {
       percentage: Number(percentage),
       collections: selectedCollections.map(collection => collection.id),
-      productGroups: selectedProductGroups.map(group => group.id)
+      productGroups: groups.map(group => ({
+        id: group.id,
+        title: group.title,
+        products: group.products.map(product => product.id)
+      }))
     };
     await applyMetafieldChange({
       type: 'updateMetafield',
@@ -302,30 +336,40 @@ function useExtensionData() {
     setSelectedCollections(updatedCollections);
   }
 
-  async function handleRemoveProductGroup(id) {
-    const updatedProductGroups = selectedProductGroups.filter(group => group.id !== id);
-    setSelectedProductGroups(updatedProductGroups);
+  async function handleRemoveGroup(id) {
+    const updatedProductGroups = groups.filter(group => group.id !== id);
+    setGroups(updatedProductGroups);
+  }
+
+  async function handleRemoveProduct(id) {
+    const updatedProductGroups = groups.map(group => {
+      const updatedProducts = group.products.filter(product => product.id !== id);
+      return { ...group, products: updatedProducts };
+    });
+    setGroups(updatedProductGroups);
   }
 
   return {
     loading,
     applyExtensionMetafieldChange,
     handleRemoveCollection,
-    handleRemoveProductGroup,
+    handleRemoveGroup,
+    handleRemoveProduct,
     i18n,
     initialSelectedCollections: initialCollectionIds,
-    initialSelectedProductGroups: initialProductGroupIds,
+    initialSelectedGroups: initialGroupIds,
     initialPercentage,
     onPercentageValueChange,
     onSelectCollections,
-    onSelectProductGroups,
+    handleAddProductsToGroup,
+    handleAddGroup,
     percentage,
     selectedCollections,
-    selectedProductGroups,
+    groups,
     resetForm: () => {
       setPercentage(initialPercentage);
       setSelectedCollections(initialSelectedCollections);
-      setSelectedProductGroups(initialSelectedProductGroups);
+      setGroups(initialSelectedGroups);
     }
   };
 }
@@ -349,6 +393,7 @@ async function getMetafieldDefinition(adminApiQuery) {
 
   return result?.data?.metafieldDefinitions?.nodes[0];
 }
+
 async function createMetafieldDefinition(adminApiQuery) {
   const definition = {
     access: {
@@ -393,6 +438,19 @@ async function getCollectionTitles(collectionGids, adminApiQuery) {
   `);
 }
 
+async function getProductTitles(productGids, adminApiQuery) {
+  return adminApiQuery(`
+    {
+      nodes(ids: ${JSON.stringify(productGids)}) {
+        ... on Product {
+          id
+          title
+        }
+      }
+    }
+  `);
+}
+
 function parseTransferExcludedCollectionIdsMetafield(value) {
   try {
     return JSON.parse(value).collections;
@@ -417,24 +475,61 @@ function ProductGroupsField({ defaultValue, value, onChange }) {
     </Box>
   );
 }
-
-function ProductGroupsSection({ i18n, loading, onClickAdd, onClickRemove, selectedProductGroups }) {
+function GroupsSection({
+  i18n,
+  loading,
+  onClickAddProducts,
+  onClickAddGroup,
+  onClickRemoveGroup,
+  onClickRemoveProduct,
+  groups
+}) {
   const productGroupRows =
-    selectedProductGroups && selectedProductGroups.length > 0
-      ? selectedProductGroups.map(group => (
+    groups && groups.length > 0
+      ? groups.map(group => (
           <BlockStack gap='base' key={group.id}>
             <InlineStack blockAlignment='center' inlineAlignment='space-between'>
-              <Link href={`shopify://admin/product_groups/${group.id.split('/').pop()}`} tone='inherit' target='_blank'>
-                {group.title}
-              </Link>
-              <Button variant='tertiary' onClick={() => onClickRemove(group.id)}>
+              <Text variant='headingSm' as='h3'>
+                {group.title || `Group ${group.id}`}
+              </Text>
+              <Button variant='tertiary' onClick={() => onClickRemoveGroup(group.id)}>
                 <Icon name='CircleCancelMajor' />
               </Button>
             </InlineStack>
+
+            {group.products && group.products.length > 0 ? (
+              <BlockStack gap='tight'>
+                {group.products.map(product => (
+                  <InlineStack key={product.id} blockAlignment='center' gap='base'>
+                    <Link
+                      href={`shopify://admin/products/${product.id.split('/').pop()}`}
+                      tone='inherit'
+                      target='_blank'
+                    >
+                      {product.title}
+                    </Link>
+                    <Button variant='tertiary' onClick={() => onClickRemoveProduct(product.id)}>
+                      <Icon name='CircleCancelMajor' />
+                    </Button>
+                  </InlineStack>
+                ))}
+              </BlockStack>
+            ) : (
+              <Text tone='subdued'>{i18n.translate('noProductsInGroup')}</Text>
+            )}
+
+            <Button onClick={() => onClickAddProducts(group.id)}>
+              <InlineStack blockAlignment='center' inlineAlignment='start' gap='base'>
+                <Icon name='CirclePlusMajor' />
+                {i18n.translate('addProducts')}
+              </InlineStack>
+            </Button>
+
             <Divider />
           </BlockStack>
         ))
       : null;
+
   return (
     <Section>
       <BlockStack gap='base'>
@@ -445,10 +540,11 @@ function ProductGroupsSection({ i18n, loading, onClickAdd, onClickRemove, select
         ) : null}
 
         {productGroupRows}
-        <Button onClick={onClickAdd}>
+
+        <Button onClick={() => onClickAddGroup(crypto.randomUUID())}>
           <InlineStack blockAlignment='center' inlineAlignment='start' gap='base'>
             <Icon name='CirclePlusMajor' />
-            {i18n.translate('addProductGroups')}
+            {i18n.translate('addGroup')}
           </InlineStack>
         </Button>
       </BlockStack>
@@ -472,7 +568,8 @@ async function getProductGroupTitles(productGroupGids, adminApiQuery) {
 
 function parseTransferExcludedProductGroupIdsMetafield(value) {
   try {
-    return JSON.parse(value).productGroups;
+    const data = JSON.parse(value ?? "") ?? {};
+    return data.productGroups || [];
   } catch {
     return [];
   }

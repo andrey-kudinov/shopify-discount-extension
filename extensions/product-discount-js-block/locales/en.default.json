@@ -1,7 +1,9 @@
 {
   "name": "Discount collection settings",
   "addCollections": "Add collections",
-  "addProductGroups": "Add product groups",
+  "addProducts": "Add products",
+  "addGroup": "Add group",
+  "noProductsInGroup": "No products in group",
   "description": "Offer a discount on all collections except the ones selected",
   "discountPercentage": "Discount percentage"
 }
