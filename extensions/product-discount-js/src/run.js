@@ -29,14 +29,12 @@ export function run(input) {
    */
   const configuration = JSON.parse(input?.discountNode?.metafield?.value ?? '{}');
 
-  console.log(JSON.stringify({ percentage: configuration.percentage }));
-
   if ((!configuration.collections && !configuration.productGroups) || !configuration.percentage) {
     return EMPTY_DISCOUNT;
   }
 
   const groups = configuration.productGroups || [];
-  const collectionIds = configuration.collections || [];
+  const collections = configuration.collections || [];
 
   const cartProducts = input.cart.lines
     .filter(line => line.merchandise.__typename === 'ProductVariant')
@@ -50,29 +48,17 @@ export function run(input) {
           inCollections: line.merchandise.product.inCollections
         })
     );
-  // console.log(JSON.stringify({ cartProducts }));
 
   const groupedCart = {};
   for (const group of groups) {
     groupedCart[group.id] = cartProducts.filter(product => group.products.includes(product.id));
   }
 
-  for (const collectionId of collectionIds) {
-    const collectionProducts = cartProducts.filter(product => 
-      product.inAnyCollection && 
-      product.inCollections.some(collection => collection.collectionId === collectionId)
-    );
-
-    console.log(JSON.stringify({ collectionId, count: collectionProducts.length }));
-  
-    if (collectionProducts.length > 0) {
-      groupedCart[`collection_${collectionId}`] = collectionProducts;
-    }
+  for (const collection of collections) {
+    groupedCart[collection.id] = cartProducts.filter(product => collection.products.includes(product.id));
   }
 
   const allGroupsPresent = Object.keys(groupedCart).every(groupId => groupedCart[groupId].length > 0);
-  
-  // console.log(JSON.stringify({ groupedCart }));
 
   if (!allGroupsPresent) {
     return EMPTY_DISCOUNT;
@@ -81,12 +67,10 @@ export function run(input) {
   let result = {};
 
   const minSets = Math.min(
-    ...Object.keys(groupedCart).map(groupId =>
-      groupedCart[groupId].reduce((sum, product) => sum + product.quantity, 0)
-    )
+    ...Object.keys(groupedCart).map(groupId => groupedCart[groupId].reduce((sum, product) => sum + product.quantity, 0))
   );
 
-  console.log(JSON.stringify({minSets}));
+  console.log(JSON.stringify({ minSets }));
 
   if (minSets < 1) {
     return EMPTY_DISCOUNT;

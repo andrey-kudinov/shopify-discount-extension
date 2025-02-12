@@ -102,11 +102,7 @@ function App() {
             value={selectedCollections}
             onChange={onSelectCollections}
           />
-          <ProductGroupsField
-            defaultValue={initialSelectedGroups}
-            value={groups}
-            onChange={handleAddProductsToGroup}
-          />
+          <ProductGroupsField defaultValue={initialSelectedGroups} value={groups} onChange={handleAddProductsToGroup} />
           <PercentageField
             value={percentage}
             defaultValue={initialPercentage}
@@ -114,8 +110,6 @@ function App() {
             i18n={i18n}
           />
         </Section>
-
-        <Divider />
 
         <Section padding='base'>
           <Box padding='base none'>
@@ -232,18 +226,22 @@ function useExtensionData() {
       );
       setInitialGroupIds(transferExcludedProductGroupIds);
 
-      await getCollectionTitles(transferExcludedCollectionIds, query).then(results => {
+      const collectionIds = transferExcludedCollectionIds.map(collection => collection.id);
+
+      await getCollectionTitles(collectionIds, query).then(results => {
         const collections = results.data.nodes.map(collection => ({
           id: collection.id,
-          title: collection.title
+          title: collection.title,
+          products: collection.products.edges.map(edge => edge.node.id)
         }));
+
         setSelectedCollections(collections);
         setInitialSelectedCollections(collections);
-        return;
       });
-      const productGroupsData = JSON.parse(
-        savedMetafields.find(metafield => metafield.key === 'function-configuration')?.value ?? '{}'
-      ).productGroups ?? [];
+
+      const productGroupsData =
+        JSON.parse(savedMetafields.find(metafield => metafield.key === 'function-configuration')?.value ?? '{}')
+          .productGroups ?? [];
 
       if (productGroupsData) {
         const productGroups = await Promise.all(
@@ -272,6 +270,35 @@ function useExtensionData() {
     setPercentage(Number(value));
   };
 
+  async function getCollectionsWithProducts(collectionIds, adminApiQuery) {
+    const query = `
+      {
+        nodes(ids: ${JSON.stringify(collectionIds)}) {
+          ... on Collection {
+            id
+            title
+            products(first: 100) {
+              edges {
+                node {
+                  id
+                  title
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await adminApiQuery(query);
+
+    return response.data.nodes.map(collection => ({
+      id: collection.id,
+      title: collection.title,
+      products: collection.products.edges.map(edge => edge.node.id)
+    }));
+  }
+
   async function onSelectCollections() {
     const selection = await resourcePicker({
       type: 'collection',
@@ -284,7 +311,12 @@ function useExtensionData() {
         variants: true
       }
     });
-    setSelectedCollections(selection);
+
+    const collectionIds = selection.map(col => col.id);
+
+    const collectionsWithProducts = await getCollectionsWithProducts(collectionIds, query);
+
+    setSelectedCollections(collectionsWithProducts);
   }
 
   async function handleAddProductsToGroup(id) {
@@ -315,13 +347,14 @@ function useExtensionData() {
   async function applyExtensionMetafieldChange() {
     const commitFormValues = {
       percentage: Number(percentage),
-      collections: selectedCollections.map(collection => collection.id),
+      collections: selectedCollections,
       productGroups: groups.map(group => ({
         id: group.id,
         title: group.title,
         products: group.products.map(product => product.id)
       }))
     };
+
     await applyMetafieldChange({
       type: 'updateMetafield',
       namespace: '$app:example-discounts--ui-extension',
@@ -432,6 +465,13 @@ async function getCollectionTitles(collectionGids, adminApiQuery) {
           id
           title
           description
+          products(first: 100) {
+            edges {
+              node {
+                id
+              }
+            }
+          }
         }
       }
     }
@@ -552,23 +592,9 @@ function GroupsSection({
   );
 }
 
-async function getProductGroupTitles(productGroupGids, adminApiQuery) {
-  return adminApiQuery(`
-    {
-      nodes(ids: ${JSON.stringify(productGroupGids)}) {
-        ... on Product {
-          id
-          title
-          description
-        }
-      }
-    }
-  `);
-}
-
 function parseTransferExcludedProductGroupIdsMetafield(value) {
   try {
-    const data = JSON.parse(value ?? "") ?? {};
+    const data = JSON.parse(value ?? '') ?? {};
     return data.productGroups || [];
   } catch {
     return [];
