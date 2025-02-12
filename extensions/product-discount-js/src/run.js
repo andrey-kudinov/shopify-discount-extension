@@ -70,8 +70,6 @@ export function run(input) {
     ...Object.keys(groupedCart).map(groupId => groupedCart[groupId].reduce((sum, product) => sum + product.quantity, 0))
   );
 
-  console.log(JSON.stringify({ minSets }));
-
   if (minSets < 1) {
     return EMPTY_DISCOUNT;
   }
@@ -95,8 +93,6 @@ export function run(input) {
     }
   }
 
-  console.log(JSON.stringify({ result }));
-
   const targets = cartProducts
     .filter(product => result[product.id])
     .map(product => ({
@@ -105,8 +101,6 @@ export function run(input) {
         quantity: result[product.id]
       }
     }));
-
-  console.log(JSON.stringify({ targets }));
 
   if (!targets.length) {
     return EMPTY_DISCOUNT;
