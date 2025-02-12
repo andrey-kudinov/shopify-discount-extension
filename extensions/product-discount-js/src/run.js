@@ -31,11 +31,12 @@ export function run(input) {
 
   console.log(JSON.stringify({ percentage: configuration.percentage }));
 
-  if (!configuration.productGroups || !configuration.percentage) {
+  if ((!configuration.collections && !configuration.productGroups) || !configuration.percentage) {
     return EMPTY_DISCOUNT;
   }
 
-  const groups = configuration.productGroups;
+  const groups = configuration.productGroups || [];
+  const collectionIds = configuration.collections || [];
 
   const cartProducts = input.cart.lines
     .filter(line => line.merchandise.__typename === 'ProductVariant')
@@ -44,32 +45,70 @@ export function run(input) {
         /** @type {ProductVariant} */ ({
           id: line.merchandise.product.id,
           variantId: /** @type {ProductVariant} */ (line.merchandise).id,
-          quantity: line.quantity
+          quantity: line.quantity,
+          inAnyCollection: line.merchandise.product.inAnyCollection,
+          inCollections: line.merchandise.product.inCollections
         })
     );
+  // console.log(JSON.stringify({ cartProducts }));
 
   const groupedCart = {};
   for (const group of groups) {
     groupedCart[group.id] = cartProducts.filter(product => group.products.includes(product.id));
   }
 
+  for (const collectionId of collectionIds) {
+    const collectionProducts = cartProducts.filter(product => 
+      product.inAnyCollection && 
+      product.inCollections.some(collection => collection.collectionId === collectionId)
+    );
+
+    console.log(JSON.stringify({ collectionId, count: collectionProducts.length }));
+  
+    if (collectionProducts.length > 0) {
+      groupedCart[`collection_${collectionId}`] = collectionProducts;
+    }
+  }
+
+  const allGroupsPresent = Object.keys(groupedCart).every(groupId => groupedCart[groupId].length > 0);
+  
+  // console.log(JSON.stringify({ groupedCart }));
+
+  if (!allGroupsPresent) {
+    return EMPTY_DISCOUNT;
+  }
+
   let result = {};
 
-  const minSets = Math.min(...groups.map(group => groupedCart[group.id].reduce((sum, item) => sum + item.quantity, 0)));
+  const minSets = Math.min(
+    ...Object.keys(groupedCart).map(groupId =>
+      groupedCart[groupId].reduce((sum, product) => sum + product.quantity, 0)
+    )
+  );
 
-  if (minSets > 0) {
-    for (const group of groups) {
-      let remaining = minSets;
-      for (const product of groupedCart[group.id] || []) {
-        let applyDiscount = Math.min(product.quantity, remaining);
-        if (applyDiscount > 0) {
-          result[product.id] = (result[product.id] || 0) + applyDiscount;
-          remaining -= applyDiscount;
+  console.log(JSON.stringify({minSets}));
+
+  if (minSets < 1) {
+    return EMPTY_DISCOUNT;
+  }
+
+  for (const groupId of Object.keys(groupedCart)) {
+    let remaining = minSets;
+
+    while (remaining > 0) {
+      let applied = false;
+
+      for (const product of groupedCart[groupId]) {
+        if (product.quantity > (result[product.id] || 0)) {
+          result[product.id] = (result[product.id] || 0) + 1;
+          applied = true;
+          break;
         }
       }
+
+      if (!applied) break;
+      remaining--;
     }
-  } else {
-    return EMPTY_DISCOUNT;
   }
 
   console.log(JSON.stringify({ result }));
@@ -100,6 +139,6 @@ export function run(input) {
         }
       }
     ],
-    discountApplicationStrategy: DiscountApplicationStrategy.First
+    discountApplicationStrategy: DiscountApplicationStrategy.Maximum
   };
 }
